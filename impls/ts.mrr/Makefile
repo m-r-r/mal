@@ -10,7 +10,7 @@ all: ts
 node_modules: package-lock.json
 	npm install
 
-build/step%.js &: node_modules $(SRC_FILES)
+build/bin/step%.js &: node_modules $(SRC_FILES)
 	./node_modules/.bin/tsc
 
 

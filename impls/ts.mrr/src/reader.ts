@@ -91,7 +91,10 @@ function* tokenize(input: string): Generator<Token> {
       case REGEXES.STRING.test(text): {
         yield {
           kind: "string",
-          value: text.slice(1, -1).replace("\\n", "\n"),
+          value: text
+            .slice(1, -1)
+            .replace(/(?<!\\)\\n/g, "\n")
+            .replace(/\\([\\"])/g, "$1"),
           pos,
           raw: text,
         };
@@ -262,7 +265,6 @@ class Reader {
         this.next();
       }
       operands.push(this.readExpression());
-      console.log("expr", operands.at(-1));
     }
 
     if (Math.sign(arity) === -1) {
