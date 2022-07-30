@@ -1,0 +1,3 @@
+#!/bin/bash
+exec node --no-warnings --es-module-specifier-resolution=node \
+    "$(dirname $0)/build/bin/${STEP:-stepA_mal}.js" "${@}" 2>&1
