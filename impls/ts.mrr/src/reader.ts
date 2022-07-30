@@ -35,7 +35,7 @@ const SPECIAL_SYNTAX: Record<string, [string, number]> = {
 const REGEXES = {
   WS: /^[\s,]*$/,
   STRING: /^"(?:\\.|[^\\"])*"$/,
-  NUMBER: /^\d+$/,
+  NUMBER: /^-?\d+$/,
   COMMENT: /^;.*$/,
   NON_SPECIAl_CHAR: /^[^\s\[\]{}('"`,;)]*$/,
   SPECIAL_CHAR: new RegExp(`^[${Object.keys(SPECIAL_SYNTAX).join("")}]+$`),
