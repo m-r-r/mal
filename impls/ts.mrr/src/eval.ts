@@ -1,73 +1,89 @@
-import { Atom, List, Expr, Vector } from "./types";
-
-function isAtom(expr: Expr): expr is Atom {
-  return (
-    typeof expr === "number" ||
-    typeof expr === "string" ||
-    typeof expr === "symbol"
-  );
-}
-
-function isCollection(expr: Expr): boolean {
-  return expr instanceof Vector || expr instanceof Map;
-}
-
-function isList(expr: Expr): expr is List {
-  return Array.isArray(expr) && !(expr instanceof Vector);
-}
-
-function symbolToString(sym: symbol): string {
-  const s = Symbol.keyFor(sym);
-  if (typeof s !== "string") {
-    throw new EvalError(`Invalid symbol ${String(sym)}`);
-  }
-  return s;
-}
+import { Expr, Vector, Environment, SpecialForm } from "./types";
+import { isList, symbolToString } from "./core";
+import { DEFAULT_ENV } from "./core";
 
 export class EvalError extends Error {}
 
-function expectNumberArgument(expr: Expr, index: number): number {
-  if (typeof expr === "number") {
-    return expr;
+function bind(env: Environment, args: Expr[], context: string): Expr {
+  if (args.length % 2 !== 0) {
+    throw new EvalError(`${context} must have an even number of bindings`);
   }
-  throw new EvalError(
-    `argument ${index} must be an integer, got ${typeof expr}`
-  );
+  const symbols: symbol[] = args.reduce((acc: symbol[], v, i) => {
+    const expectSym = i % 2 === 0;
+    if (!expectSym) {
+      return acc;
+    }
+    if (typeof v !== "symbol") {
+      throw new EvalError(`${context} : argument ${i} should be a symbol`);
+    }
+    acc.push(v);
+    return acc;
+  }, []);
+  const values = args.filter((_, i) => i % 2 !== 0);
+
+  let result: Expr = Symbol.for("nil");
+  symbols.forEach((sym, i) => {
+    result = env.set(sym, evaluate(values[i]!, env));
+  });
+  return result;
 }
 
-const env: Record<string, (...args: Expr[]) => Expr> = {
-  "+": (...args) =>
-    args.map(expectNumberArgument).reduce((acc, i) => acc + i, 0),
-  "-": (...args) => {
-    const nums: number[] = args.map(expectNumberArgument) as number[];
-    if (nums.length > 1) {
-      return nums.reduce((a: number, b: number): number => a - b);
-    } else {
-      return nums.reduce((a, b) => a - b, 0);
-    }
-  },
-  "*": (...args) => args.map(expectNumberArgument).reduce((a, b) => a * b, 1),
-  "/": (...args) => args.map(expectNumberArgument).reduce((a, b) => a / b),
-};
+const SPECIAL_FORMS: Map<symbol, SpecialForm> = new Map(
+  Object.entries({
+    "def!": (env, ...args): Expr => bind(env, args, "def!"),
+    "let*": (env, ...args): Expr => {
+      const [bindings, ...body] = args;
+      if (!Array.isArray(bindings)) {
+        throw new EvalError(
+          `def! : argument #0 must be a list or an array of bindings`
+        );
+      }
+      if (body.length < 1) {
+        throw new EvalError(`def! should have at least two arguments`);
+      }
+      env = env.extend();
+      return body.reduce(
+        (last: Expr, body: Expr) => evaluate(body, env),
+        bind(env, bindings, "let*")
+      );
+    },
+  } as Record<string, SpecialForm>).map(([k, v]) => [Symbol.for(k), v])
+);
 
-export default function evaluate(expr: Expr): Expr {
+export default function evaluate(
+  expr: Expr,
+  env: Environment = DEFAULT_ENV
+): Expr {
   if (expr instanceof Map) {
     return new Map(
-      Array.from(expr.entries()).map(([k, v]) => [evaluate(k), evaluate(v)])
+      Array.from(expr.entries()).map(([k, v]) => [
+        evaluate(k, env),
+        evaluate(v, env),
+      ])
     );
   } else if (expr instanceof Vector) {
-    return expr.map((i) => evaluate(i));
+    return expr.map((i) => evaluate(i, env));
   } else if (isList(expr) && expr.length >= 1) {
     const [symbol, ...args] = expr;
     if (typeof symbol !== "symbol") {
       throw new EvalError(`Value of type ${typeof expr} is not callable`);
     }
-    const fnName = symbolToString(symbol);
-    const fn = env[fnName];
-    if (typeof fn !== "function") {
-      throw new EvalError(`unbound symbol ${fnName}`);
+    const specialForm = SPECIAL_FORMS.get(symbol);
+    if (typeof specialForm !== "undefined") {
+      return specialForm(env, ...args);
     }
-    return fn(...args.map((a) => evaluate(a)));
+    const fn = env.get(symbol);
+    if (typeof fn !== "function") {
+      throw new EvalError(
+        `sumbol ${symbolToString(symbol)} is not bound to a function`
+      );
+    }
+    return fn(...args.map((a) => evaluate(a, env)));
+  } else if (typeof expr === "symbol") {
+    if (Symbol.keyFor(expr)?.startsWith(":")) {
+      return expr;
+    }
+    return env.get(expr);
   } else {
     return expr;
   }
