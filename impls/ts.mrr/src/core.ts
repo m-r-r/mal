@@ -130,6 +130,9 @@ const count = (expr: Expr): number => {
 };
 
 export const DEFAULT_ENV = new Environment({
+  true: Symbol.for("true"),
+  false: Symbol.for("false"),
+  nil: Symbol.for("nil"),
   "+": numFn("+", (...args) => args.reduce((acc, i) => acc + i, 0)),
   "-": numFn("-", (...nums) => {
     if (nums.length > 1) {

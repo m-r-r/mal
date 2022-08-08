@@ -138,6 +138,8 @@ const SPECIAL_FORMS: Map<symbol, SpecialForm> = new Map(
   } as Record<string, SpecialForm>).map(([k, v]) => [Symbol.for(k), v])
 );
 
+export const SPECIAL_FORMS_SYMBOLS: symbol[] = Array.from(SPECIAL_FORMS.keys());
+
 export default function evaluate(
   expr: Expr,
   env: Environment = DEFAULT_ENV

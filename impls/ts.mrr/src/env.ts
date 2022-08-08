@@ -32,4 +32,11 @@ export default class Environment {
     child.parent = this;
     return child;
   }
+
+  list(): Set<symbol> {
+    return new Set([
+      ...this.bindings.keys(),
+      ...(this.parent?.list().values() ?? []),
+    ]);
+  }
 }
